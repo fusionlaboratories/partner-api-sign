@@ -1,0 +1,11 @@
+{
+  "name": "ACME Corp17",
+  "city": "Paris",
+  "country": "FR17",
+  "domain": "acme4.com",
+  "ref": "9827feed-5eae-4e80-bda3-drtreteraa7c3b97add",
+  "anon_IOI": false,
+  "anon_RFQ": false,
+  "tc_only": false,
+  "dir_listed": false
+}
