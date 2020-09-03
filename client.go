@@ -79,7 +79,6 @@ func loadNonce(req *request) {
 	defer n.Close()
 	req.nonce = "0"
 	if err != nil {
-		fmt.Println(err)
 		return
 	}
 
