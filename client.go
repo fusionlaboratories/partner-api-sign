@@ -8,15 +8,26 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
+)
+
+var (
+	flagURL        = flag.String("url", "", "URL")
+	flagPEMFile    = flag.String("pemfile", "private.pem", "Private key pem file")
+	flagAPIKeyFile = flag.String("keyfile", "apikey", "API key file")
+	flagAPIKey     = flag.String("apikey", "", "API key")
+	flagNonce      = flag.String("nonce", "", "Reset nonce")
+	flagNonceFile  = flag.String("noncefile", "nonce", "Nonce file")
 )
 
 type request struct {
@@ -31,18 +42,39 @@ type request struct {
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Printf("Usage: ./%s sign|<request>\n", os.Args[0])
+		fmt.Printf("Usage: ./%s sign|websocket|<request>\n", os.Args[0])
+		flag.Usage()
 		return
 	}
 
-	if os.Args[1] == "sign" {
-		req := interview()
+	if err := flag.CommandLine.Parse(os.Args[2:]); err != nil {
+		fmt.Printf("Usage: ./%s sign|websocket|<request>\n", os.Args[0])
+		flag.Usage()
+		return
+	}
+
+	switch os.Args[1] {
+	case "sign":
+		req := interview(true)
 		loadRSAKey(req)
 		loadNonce(req)
 		signRequest(req)
 		writeNonce(req.nonce)
 		fmt.Printf("x-sign: %s\n", req.signature)
 		fmt.Printf("x-nonce: %s\n", req.nonce)
+
+		os.Exit(0)
+	case "websocket":
+		req := interview(false)
+		loadRSAKey(req)
+		loadNonce(req)
+		loadAPIKey(req)
+		signRequest(req)
+		writeNonce(req.nonce)
+		fmt.Printf("x-sign: %s\n", req.signature)
+		fmt.Printf("x-nonce: %s\n", req.nonce)
+
+		connectWebSocket(req)
 
 		os.Exit(0)
 	}
@@ -57,7 +89,7 @@ func main() {
 }
 
 func loadRSAKey(req *request) {
-	f, err := os.Open("private.pem")
+	f, err := os.Open(*flagPEMFile)
 	defer f.Close()
 
 	if err != nil {
@@ -75,37 +107,37 @@ func loadRSAKey(req *request) {
 }
 
 func loadNonce(req *request) {
-	n, err := os.Open("nonce")
-	defer n.Close()
-	req.nonce = "0"
-	if err != nil {
-		return
-	}
+	var nStr = ""
+	if *flagNonce == "" {
+		nBytes, err := ioutil.ReadFile(*flagNonceFile)
+		if err != nil {
+			if !os.IsNotExist(err) {
+				fmt.Println("Error loading nonce file", err)
+				os.Exit(1)
+			}
 
-	nBytes, err := ioutil.ReadAll(n)
-	if err != nil {
-		panic(err)
-	}
-	nStr := strings.Trim(string(nBytes), "\n ")
-	if nStr == "" {
-		nStr = "0"
+			fmt.Println("Nonce file not found")
+		}
+		nStr = strings.TrimSpace(string(nBytes))
+
+	} else {
+		nStr = *flagNonce
 	}
 
 	nonce, err := strconv.Atoi(nStr)
 	if err != nil {
-		panic(err)
+		fmt.Println("Error parse nonce", err)
+		os.Exit(1)
 	}
 
 	req.nonce = strconv.Itoa(nonce + 1)
 }
 
 func writeNonce(nonce string) {
-	n, err := os.OpenFile("nonce", os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
-	defer n.Close()
-	if err != nil {
-		panic(err)
+	if err := ioutil.WriteFile(*flagNonceFile, []byte(nonce), 0644); err != nil {
+		fmt.Println("Error write nonce file", err)
+		os.Exit(1)
 	}
-	n.WriteString(nonce)
 }
 
 func loadRequest(req string) *request {
@@ -144,7 +176,12 @@ func loadRequest(req string) *request {
 }
 
 func loadAPIKey(req *request) {
-	k, err := os.Open("apikey")
+	if *flagAPIKey != "" {
+		req.apiKey = *flagAPIKey
+		return
+	}
+
+	k, err := os.Open(*flagAPIKeyFile)
 	defer k.Close()
 	if err != nil {
 		panic(err)
@@ -164,6 +201,7 @@ func signRequest(req *request) {
 	h.Write([]byte(req.uri))
 	h.Write(req.body)
 	dgst := h.Sum(nil)
+	fmt.Println(hex.EncodeToString(dgst))
 	signature, err := rsa.SignPKCS1v15(nil, req.rsaKey, crypto.SHA256, dgst)
 	if err != nil {
 		panic(err)
@@ -201,27 +239,34 @@ func sendRequest(req *request) {
 
 }
 
-func interview() *request {
+func interview(requestBody bool) *request {
 	req := &request{}
 	reader := bufio.NewReader(os.Stdin)
-	fmt.Printf("url: ")
-	text, _ := reader.ReadString('\n')
-	req.uri = strings.Trim(text, "\n ")
 
-	fmt.Printf("body (hit return to end):\n")
-	scanner := bufio.NewScanner(os.Stdin)
-	buffer := ""
-	for scanner.Scan() {
-		if scanner.Text() == "" {
-			break
-		}
-		buffer += scanner.Text() + "\n"
+	if *flagURL != "" {
+		req.uri = *flagURL
+		fmt.Println("url: ", req.uri)
+	} else {
+		fmt.Printf("url: ")
+		text, _ := reader.ReadString('\n')
+		req.uri = strings.Trim(text, "\n ")
 	}
 
-	compacted := []byte{}
-	b := bytes.NewBuffer(compacted)
-	json.Compact(b, []byte(buffer))
-	req.body = b.Bytes()
+	if requestBody {
+		fmt.Printf("body (hit return to end):\n")
+		scanner := bufio.NewScanner(os.Stdin)
+		buffer := ""
+		for scanner.Scan() {
+			if scanner.Text() == "" {
+				break
+			}
+			buffer += scanner.Text() + "\n"
+		}
+		compacted := []byte{}
+		b := bytes.NewBuffer(compacted)
+		json.Compact(b, []byte(buffer))
+		req.body = b.Bytes()
+	}
 
 	return req
 }
