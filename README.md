@@ -1,4 +1,4 @@
-# partner-client
+# Parnter API Signing Client
 
 ## Description
 This is a simple setup for easier sending of signed requests to the Qredo Partner API.
