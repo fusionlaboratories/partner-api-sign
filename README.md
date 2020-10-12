@@ -1,7 +1,7 @@
 # Parnter API Signing Client
 
 ## Description
-This is a simple setup for easier sending of signed requests to the Qredo Partner API.
+This is a simple client program for setting up, generating and sending of signed requests to the Qredo Partner API.
 It comprises of a `client.go` program and several other text files and directories describing keys and request data.
 
 ### Keys
