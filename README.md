@@ -1,7 +1,7 @@
 # partner-client
 
 ## Description
-This is a simple setup for easier sending of signed requests to the qredo-server partner api.
+This is a simple setup for easier sending of signed requests to the Qredo Partner API.
 It comprises of a `client.go` program and several other text files and directories describing keys and request data.
 
 ### Keys
@@ -15,6 +15,7 @@ go run ./client.go sign
 ```
 You will be prompted to enter url and body. Make sure that you body has a new line at the end.
 **Note:** the body is expected to be valid JSON and will be compacted before signing.
+
 #### Example
 GET request (no body)
 ```
