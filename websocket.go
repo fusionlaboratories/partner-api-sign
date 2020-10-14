@@ -42,6 +42,7 @@ func connectWebSocket(req *request) {
 
 	done := make(chan struct{})
 
+	fmt.Printf("connected \n\n")
 	go func() {
 		defer close(done)
 		for {
@@ -51,7 +52,7 @@ func connectWebSocket(req *request) {
 				return
 			}
 
-			fmt.Printf("recv: %v\n", v)
+			fmt.Printf("NEW ACTION: %v\nType: %v\tStatus: %v\nCreated: %v\tExpires: %v\n\n", v.ID, v.Type, v.Status, time.Unix(v.Timestamp, 0).Format(time.RFC822), time.Unix(v.ExpireTime, 0).Format(time.RFC822))
 		}
 	}()
 
