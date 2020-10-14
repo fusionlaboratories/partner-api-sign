@@ -117,8 +117,10 @@ func loadNonce(req *request) {
 			}
 
 			fmt.Println("Nonce file not found")
+			nStr = "0"
+		} else {
+			nStr = strings.TrimSpace(string(nBytes))
 		}
-		nStr = strings.TrimSpace(string(nBytes))
 
 	} else {
 		nStr = *flagNonce
