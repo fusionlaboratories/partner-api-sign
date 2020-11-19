@@ -205,12 +205,14 @@ func interview(req *request, requestBody bool) error {
 			}
 			buffer += scanner.Text() + "\n"
 		}
-		compacted := []byte{}
-		b := bytes.NewBuffer(compacted)
-		if err := json.Compact(b, []byte(buffer)); err != nil {
-			return err
+		if buffer != "" {
+			compacted := []byte{}
+			b := bytes.NewBuffer(compacted)
+			if err := json.Compact(b, []byte(buffer)); err != nil {
+				return errors.Wrap(err, "invalid json")
+			}
+			req.body = b.Bytes()
 		}
-		req.body = b.Bytes()
 	}
 
 	return nil
