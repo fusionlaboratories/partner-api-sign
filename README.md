@@ -57,39 +57,35 @@ x-timestamp: 1605779886
 ```
 
 ### Sending requests
-In subdirectory `requests/` create a new directory with the name of the request for example `company_update`. 
+In subdirectory `requests/` create a new directory with the name of the request for example `company_new`. 
 Create two files in that directory named `uri` and `body` e.g.:
 
-file `requests/company_update/uri`:
+file `requests/company_new/uri`:
 ```
-PUT https://api.qredo.network/api/v1/p/company/1eJFur7EANNaDjcqbm1ZgYFF5Nz
+POST https://api.qredo.network/api/v1/p/company
 ```
-file `requests/company_update/body`:
+file `requests/company_new/body`:
 ```
 {
-  "name": "ACME Corp17",
+  "name": "ACME Corp",
   "city": "Paris",
-  "country": "FR17",
-  "domain": "acme4.com",
-  "ref": "9827feed-5eae-4e80-bda3-drtreteraa7c3b97add",
-  "anon_IOI": false,
-  "anon_RFQ": false,
-  "tc_only": false,
-  "dir_listed": false
+  "country": "FR",
+  "domain": "example.com",
+  "ref": "9827feed-5eae-4e80-bda3-drtreteraa7c3b97add"
 }
 
 ```
 
 then run:
 ```
-./partner-api-sign company_update
+./partner-api-sign company_new
 ```
-where `company_update` is the directory name
+where `company_new` is the directory name
 
 #### Full example
 ```
-» ./partner-api-sign company_update
-PUT https://api.qredo.network/api/v1/p/company/1eJFur7EANNaDjcqbm1ZgYFF5Nz
+» ./partner-api-sign company_new
+POST https://api.qredo.network/api/v1/p/company
 x-api-key: eyJrZXlfaWQiOiI5cUJ1cGRrYTctU19kdyIsImtleSI6IndOTGlLSC1EMmRKall5YUV1V3hoS0RmaG9XZTVqUTNib3JKdWZjeERzcFUifQ
 x-sign: X66PWIazZomn4Q-kzRZX71_6FqtcGS6QYNaZfPV6OAZkxNXg9dpdZUfX_svfCpJVXRtZ3wyIxT2PThfEM7l94ihowpwWzZ6zUZ0Dk1dJFaMxeRxVmT8AGIiR4GncEgnNStcAcPaIsFwarq43lOJKMJgppR3gkEqB5i7n6sWA-EghssqG4lZdzfAvdLfeXUZfe_poQS1sPMSy8gDqbAeo0UIyrtSVG3Duwsh2_UPIsyqKu9fdmllErfRNTXoFZe7i7Ulr4y7Ya45gyUYEzdqT8Gm3t0OttQqEyyvIwx7nrmy1ACaZwmg-SQmWkJevug9xXMozLvgqgHw3_erOm_Kenw
 x-timestamp: 1605779886
