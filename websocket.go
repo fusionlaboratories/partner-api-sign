@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -31,7 +30,7 @@ func connectWebSocket(req *request) {
 	headers := http.Header{}
 	headers.Add("x-api-key", req.apiKey)
 	headers.Add("x-sign", req.signature)
-	headers.Add("x-nonce", req.nonce)
+	headers.Add("x-timestamp", req.timestamp)
 
 	c, _, err := websocket.DefaultDialer.Dial(url, headers)
 	if err != nil {
@@ -63,11 +62,9 @@ func connectWebSocket(req *request) {
 		case <-interrupt:
 			fmt.Println("interrupt")
 
-			// Cleanly close the connection by sending a close message and then
-			// waiting (with timeout) for the server to close the connection.
 			err := c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 			if err != nil {
-				log.Println("write close:", err)
+				fmt.Println("write close:", err)
 				return
 			}
 			select {

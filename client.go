@@ -8,26 +8,27 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
-	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
-	"strconv"
+	"path/filepath"
 	"strings"
+	"time"
+
+	"github.com/pkg/errors"
 )
 
 var (
-	flagURL        = flag.String("url", "", "URL")
-	flagPEMFile    = flag.String("pemfile", "private.pem", "Private key pem file")
-	flagAPIKeyFile = flag.String("keyfile", "apikey", "API key file")
-	flagAPIKey     = flag.String("apikey", "", "API key")
-	flagNonce      = flag.String("nonce", "", "Reset nonce")
-	flagNonceFile  = flag.String("noncefile", "nonce", "Nonce file")
+	flagURL        = flag.String("url", "", "URL to be used")
+	flagMethod     = flag.String("method", "", "HTTP method to be used")
+	flagPEMFile    = flag.String("pem-file", "private.pem", "Private key pem file")
+	flagAPIKeyFile = flag.String("key-file", "apikey", "API key file")
+	flagAPIKey     = flag.String("api-key", "", "API key")
+	flagTimestamp  = flag.String("timestamp", "", "Timestamp to be used")
 )
 
 type request struct {
@@ -35,65 +36,24 @@ type request struct {
 	uri       string
 	body      []byte
 	apiKey    string
-	nonce     string
+	timestamp string
 	signature string
 	rsaKey    *rsa.PrivateKey
 }
 
-func main() {
-	if len(os.Args) < 2 {
-		fmt.Printf("Usage: ./%s sign|websocket|<request>\n", os.Args[0])
-		flag.Usage()
-		return
+func checkErr(err error) {
+	if err != nil {
+		fmt.Println("Error:", err)
+		os.Exit(1)
 	}
-
-	if err := flag.CommandLine.Parse(os.Args[2:]); err != nil {
-		fmt.Printf("Usage: ./%s sign|websocket|<request>\n", os.Args[0])
-		flag.Usage()
-		return
-	}
-
-	switch os.Args[1] {
-	case "sign":
-		req := interview(true)
-		loadRSAKey(req)
-		loadNonce(req)
-		signRequest(req)
-		writeNonce(req.nonce)
-		fmt.Printf("x-sign: %s\n", req.signature)
-		fmt.Printf("x-nonce: %s\n", req.nonce)
-
-		os.Exit(0)
-	case "websocket":
-		req := interview(false)
-		loadRSAKey(req)
-		loadNonce(req)
-		loadAPIKey(req)
-		signRequest(req)
-		writeNonce(req.nonce)
-		fmt.Printf("x-sign: %s\n", req.signature)
-		fmt.Printf("x-nonce: %s\n", req.nonce)
-
-		connectWebSocket(req)
-
-		os.Exit(0)
-	}
-
-	req := loadRequest(os.Args[1])
-	loadAPIKey(req)
-	loadRSAKey(req)
-	loadNonce(req)
-	signRequest(req)
-	sendRequest(req)
-	writeNonce(req.nonce)
 }
 
-func loadRSAKey(req *request) {
+func loadRSAKey(req *request) error {
 	f, err := os.Open(*flagPEMFile)
 	defer f.Close()
 
 	if err != nil {
-		panic(err)
+		return errors.Wrap(err, "load RSA key")
 	}
 
 	pemData, err := ioutil.ReadAll(f)
@@ -102,147 +62,128 @@ func loadRSAKey(req *request) {
 
 	req.rsaKey, err = x509.ParsePKCS1PrivateKey(block.Bytes)
 	if err != nil {
-		panic(err)
+		return errors.Wrap(err, "parse RSA key")
+	}
+	return nil
+}
+
+func genTimestamp(req *request) {
+	if *flagTimestamp != "" {
+		req.timestamp = *flagTimestamp
+	} else {
+		req.timestamp = fmt.Sprintf("%v", time.Now().Unix())
 	}
 }
 
-func loadNonce(req *request) {
-	var nStr = ""
-	if *flagNonce == "" {
-		nBytes, err := ioutil.ReadFile(*flagNonceFile)
+func loadRequest(req *request, requestName string) error {
+	if *flagURL != "" {
+		if *flagMethod == "" {
+			return errors.New("URL option provided without method")
+		}
+		req.uri = *flagURL
+		req.method = *flagMethod
+	} else {
+		uriFile, err := os.Open(fmt.Sprintf("requests/%s/uri", requestName))
+		defer uriFile.Close()
 		if err != nil {
-			if !os.IsNotExist(err) {
-				fmt.Println("Error loading nonce file", err)
-				os.Exit(1)
-			}
-
-			fmt.Println("Nonce file not found")
-			nStr = "0"
-		} else {
-			nStr = strings.TrimSpace(string(nBytes))
+			return errors.Wrap(err, "load request URI file")
 		}
 
-	} else {
-		nStr = *flagNonce
+		uriData, err := ioutil.ReadAll(uriFile)
+		uriString := strings.Trim(string(uriData), "\n ")
+		words := strings.Split(uriString, " ")
+		if len(words) != 2 {
+			return errors.New("invalid URI file")
+		}
+
+		req.method = words[0]
+		req.uri = words[1]
 	}
 
-	nonce, err := strconv.Atoi(nStr)
-	if err != nil {
-		fmt.Println("Error parse nonce", err)
-		os.Exit(1)
-	}
-
-	req.nonce = strconv.Itoa(nonce + 1)
-}
-
-func writeNonce(nonce string) {
-	if err := ioutil.WriteFile(*flagNonceFile, []byte(nonce), 0644); err != nil {
-		fmt.Println("Error write nonce file", err)
-		os.Exit(1)
-	}
-}
-
-func loadRequest(req string) *request {
-	uriFile, err := os.Open(fmt.Sprintf("requests/%s/uri", req))
-	defer uriFile.Close()
-	if err != nil {
-		panic(err)
-	}
-
-	uriData, err := ioutil.ReadAll(uriFile)
-	uriString := strings.Trim(string(uriData), "\n ")
-	words := strings.Split(uriString, " ")
-	if len(words) != 2 {
-		panic(errors.New("invalid uri file"))
-	}
-
-	result := &request{
-		method: words[0],
-		uri:    words[1],
-	}
-
-	if result.method == http.MethodPost || result.method == http.MethodPut || result.method == http.MethodPatch {
-		bodyFile, err := os.Open(fmt.Sprintf("requests/%s/body", req))
+	if req.method == http.MethodPost || req.method == http.MethodPut || req.method == http.MethodPatch {
+		bodyFile, err := os.Open(fmt.Sprintf("requests/%s/body", requestName))
 		if err != nil {
-			panic(err)
+			return errors.Wrap(err, "open body file")
 		}
 
 		body, err := ioutil.ReadAll(bodyFile)
 		if err != nil {
-			panic(err)
+			return errors.Wrap(err, "read body file")
 		}
-		result.body = body
+		req.body = body
 	}
 
-	return result
+	return nil
 }
 
-func loadAPIKey(req *request) {
+func loadAPIKey(req *request) error {
 	if *flagAPIKey != "" {
 		req.apiKey = *flagAPIKey
-		return
+		return nil
 	}
 
 	k, err := os.Open(*flagAPIKeyFile)
 	defer k.Close()
 	if err != nil {
-		panic(err)
+		return errors.Wrap(err, "open api key file")
+
 	}
 
 	key, err := ioutil.ReadAll(k)
 	if err != nil {
-		panic(key)
+		return errors.Wrap(err, "read api key file")
 	}
 
-	req.apiKey = base64.RawURLEncoding.EncodeToString(key)
+	req.apiKey = strings.TrimSpace(string(key))
+	return nil
 }
 
-func signRequest(req *request) {
+func signRequest(req *request) error {
 	h := sha256.New()
-	h.Write([]byte(req.nonce))
+	h.Write([]byte(req.timestamp))
 	h.Write([]byte(req.uri))
 	h.Write(req.body)
 	dgst := h.Sum(nil)
-	fmt.Println(hex.EncodeToString(dgst))
+	fmt.Printf("Hash: %x\n", dgst)
 	signature, err := rsa.SignPKCS1v15(nil, req.rsaKey, crypto.SHA256, dgst)
 	if err != nil {
-		panic(err)
+		return errors.Wrap(err, "sign request")
 	}
 
 	req.signature = base64.RawURLEncoding.EncodeToString(signature)
+	return nil
 }
 
-func sendRequest(req *request) {
+func sendRequest(req *request) error {
 	client := http.Client{}
 	httpReq, err := http.NewRequest(req.method, req.uri, bytes.NewReader(req.body))
 	if err != nil {
-		panic(err)
+		return errors.Wrap(err, "create http request")
 	}
 
 	fmt.Printf("%s %s\n", req.method, req.uri)
 	fmt.Printf("x-api-key: %s\n", req.apiKey)
 	fmt.Printf("x-sign: %s\n", req.signature)
-	fmt.Printf("x-nonce: %s\n", req.nonce)
+	fmt.Printf("x-timestamp: %s\n", req.timestamp)
 	fmt.Println("---")
 	httpReq.Header.Add("x-api-key", req.apiKey)
 	httpReq.Header.Add("x-sign", req.signature)
-	httpReq.Header.Add("x-nonce", req.nonce)
+	httpReq.Header.Add("x-timestamp", req.timestamp)
 
 	resp, err := client.Do(httpReq)
 	if err != nil {
-		panic(err)
+		return errors.Wrap(err, "execute http request")
 	}
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		panic(err)
+		return errors.Wrap(err, "read response body")
 	}
 	fmt.Printf("%s\n%s\n", resp.Status, string(body))
-
+	return nil
 }
 
-func interview(requestBody bool) *request {
-	req := &request{}
+func interview(req *request, requestBody bool) error {
 	reader := bufio.NewReader(os.Stdin)
 
 	if *flagURL != "" {
@@ -266,9 +207,57 @@ func interview(requestBody bool) *request {
 		}
 		compacted := []byte{}
 		b := bytes.NewBuffer(compacted)
-		json.Compact(b, []byte(buffer))
+		if err := json.Compact(b, []byte(buffer)); err != nil {
+			return err
+		}
 		req.body = b.Bytes()
 	}
 
-	return req
+	return nil
+}
+
+func printHelpAndExit() {
+	fmt.Printf("Usage: %s sign|websocket|<request> [options]\n\nOptions:\n", filepath.Base(os.Args[0]))
+	flag.PrintDefaults()
+	os.Exit(1)
+}
+
+func main() {
+	if len(os.Args) < 2 {
+		printHelpAndExit()
+	}
+
+	if err := flag.CommandLine.Parse(os.Args[2:]); err != nil {
+		printHelpAndExit()
+	}
+
+	req := &request{}
+
+	switch os.Args[1] {
+	case "sign":
+		checkErr(interview(req, true))
+		checkErr(loadRSAKey(req))
+		genTimestamp(req)
+		checkErr(signRequest(req))
+		fmt.Printf("x-sign: %s\n", req.signature)
+		fmt.Printf("x-timestamp: %s\n", req.timestamp)
+
+	case "websocket":
+		checkErr(interview(req, false))
+		checkErr(loadRSAKey(req))
+		genTimestamp(req)
+		checkErr(loadAPIKey(req))
+		checkErr(signRequest(req))
+		fmt.Printf("x-sign: %s\n", req.signature)
+		fmt.Printf("x-timestamp: %s\n", req.timestamp)
+
+		connectWebSocket(req)
+	default:
+		checkErr(loadRequest(req, os.Args[1]))
+		checkErr(loadAPIKey(req))
+		checkErr(loadRSAKey(req))
+		genTimestamp(req)
+		checkErr(signRequest(req))
+		checkErr(sendRequest(req))
+	}
 }
