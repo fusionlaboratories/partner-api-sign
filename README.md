@@ -1,4 +1,4 @@
-# Parnter API Signing Client
+# Partner API Signing Client
 
 ## Description
 This is a simple client program for setting up, generating and sending of signed requests to the Qredo Partner API.
