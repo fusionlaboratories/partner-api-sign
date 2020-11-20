@@ -69,7 +69,7 @@ func loadRSAKey(req *request) error {
 
 func genTimestamp(req *request) {
 	if *flagTimestamp != "" {
-		req.timestamp = *flagTimestamp
+		req.timestamp = strings.TrimSpace(*flagTimestamp)
 	} else {
 		req.timestamp = fmt.Sprintf("%v", time.Now().Unix())
 	}
@@ -90,7 +90,7 @@ func loadRequest(req *request, requestName string) error {
 		}
 
 		uriData, err := ioutil.ReadAll(uriFile)
-		uriString := strings.Trim(string(uriData), "\n ")
+		uriString := strings.TrimSpace(string(uriData))
 		words := strings.Split(uriString, " ")
 		if len(words) != 2 {
 			return errors.New("invalid URI file")
@@ -192,7 +192,7 @@ func interview(req *request, requestBody bool) error {
 	} else {
 		fmt.Printf("url: ")
 		text, _ := reader.ReadString('\n')
-		req.uri = strings.Trim(text, "\n ")
+		req.uri = strings.TrimSpace(text)
 	}
 
 	if requestBody {
