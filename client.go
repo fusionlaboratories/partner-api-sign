@@ -219,7 +219,7 @@ func interview(req *request, requestBody bool) error {
 }
 
 func printHelpAndExit() {
-	fmt.Printf("Usage: %s sign|websocket|<request> [options]\n\nOptions:\n", filepath.Base(os.Args[0]))
+	fmt.Printf("Usage: %s sign|websocket|liquidityhub|<request> [options]\n\nOptions:\n", filepath.Base(os.Args[0]))
 	flag.PrintDefaults()
 	os.Exit(1)
 }
@@ -244,7 +244,7 @@ func main() {
 		fmt.Printf("x-sign: %s\n", req.signature)
 		fmt.Printf("x-timestamp: %s\n", req.timestamp)
 
-	case "websocket":
+	case "websocket", "liquidityhub":
 		checkErr(interview(req, false))
 		checkErr(loadRSAKey(req))
 		genTimestamp(req)
@@ -253,7 +253,12 @@ func main() {
 		fmt.Printf("x-sign: %s\n", req.signature)
 		fmt.Printf("x-timestamp: %s\n", req.timestamp)
 
-		connectWebSocket(req)
+		wsType := wsCoreClient
+		if os.Args[1] == "liquidityhub" {
+			wsType = wsLiquidityHub
+		}
+
+		connectWebSocket(req, wsType)
 	default:
 		checkErr(loadRequest(req, os.Args[1]))
 		checkErr(loadAPIKey(req))

@@ -10,6 +10,15 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+const (
+	wsCoreClient = iota
+	wsLiquidityHub
+)
+
+type Parser interface {
+	Parse() string
+}
+
 type ActionInfo struct {
 	ID         string `json:"id"`
 	ClientID   string `json:"clientID"`
@@ -19,7 +28,19 @@ type ActionInfo struct {
 	ExpireTime int64  `json:"expireTime"`
 }
 
-func connectWebSocket(req *request) {
+func (a *ActionInfo) Parse() string {
+	return fmt.Sprintf("NEW ACTION: %v\nType: %v\tStatus: %v\nCreated: %v\tExpires: %v\n\n", a.ID, a.Type, a.Status, time.Unix(a.Timestamp, 0).Format(time.RFC822), time.Unix(a.ExpireTime, 0).Format(time.RFC822))
+}
+
+type LiquidityHubInfo struct {
+	TxID string `json:"txID"`
+}
+
+func (lh *LiquidityHubInfo) Parse() string {
+	return fmt.Sprintf("NEW SWAP IN LIQUIDITY HUB: %v", lh.TxID)
+}
+
+func connectWebSocket(req *request, wsType int) {
 	url := req.uri
 
 	interrupt := make(chan os.Signal, 1)
@@ -45,13 +66,18 @@ func connectWebSocket(req *request) {
 	go func() {
 		defer close(done)
 		for {
-			v := &ActionInfo{}
+			var v Parser
+			switch wsType {
+			case wsCoreClient:
+				v = &ActionInfo{}
+			case wsLiquidityHub:
+				v = &LiquidityHubInfo{}
+			}
 			if err := c.ReadJSON(v); err != nil {
 				fmt.Println("read from websocket:", err)
 				return
 			}
-
-			fmt.Printf("NEW ACTION: %v\nType: %v\tStatus: %v\nCreated: %v\tExpires: %v\n\n", v.ID, v.Type, v.Status, time.Unix(v.Timestamp, 0).Format(time.RFC822), time.Unix(v.ExpireTime, 0).Format(time.RFC822))
+			fmt.Println(v.Parse())
 		}
 	}()
 
