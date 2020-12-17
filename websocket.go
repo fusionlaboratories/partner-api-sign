@@ -33,11 +33,12 @@ func (a *ActionInfo) Parse() string {
 }
 
 type LiquidityHubInfo struct {
-	TxID string `json:"txID"`
+	TxID   string `json:"txID"`
+	Status string `json:"status"`
 }
 
 func (lh *LiquidityHubInfo) Parse() string {
-	return fmt.Sprintf("NEW SWAP IN LIQUIDITY HUB: %v", lh.TxID)
+	return fmt.Sprintf("UPDATE IN LIQUIDITY HUB. TxID: %v, Status: %v", lh.TxID, lh.Status)
 }
 
 func connectWebSocket(req *request, wsType int) {
