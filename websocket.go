@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -11,8 +12,10 @@ import (
 )
 
 const (
-	wsCoreClient = iota
+	wsRaw = iota
+	wsCoreClient
 	wsLiquidityHub
+	wsWalletUpdates
 )
 
 type Parser interface {
@@ -39,6 +42,13 @@ type LiquidityHubInfo struct {
 
 func (lh *LiquidityHubInfo) Parse() string {
 	return fmt.Sprintf("UPDATE IN LIQUIDITY HUB. TxID: %v, Status: %v", lh.TxID, lh.Status)
+}
+
+type RawInfo map[string]interface{}
+
+func (ri *RawInfo) Parse() string {
+	out, _ := json.MarshalIndent(ri, "", "  ")
+	return string(out)
 }
 
 func connectWebSocket(req *request, wsType int) {
@@ -73,6 +83,8 @@ func connectWebSocket(req *request, wsType int) {
 				v = &ActionInfo{}
 			case wsLiquidityHub:
 				v = &LiquidityHubInfo{}
+			default:
+				v = &RawInfo{}
 			}
 			if err := c.ReadJSON(v); err != nil {
 				fmt.Println("read from websocket:", err)
