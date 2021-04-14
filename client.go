@@ -244,7 +244,7 @@ func main() {
 		fmt.Printf("x-sign: %s\n", req.signature)
 		fmt.Printf("x-timestamp: %s\n", req.timestamp)
 
-	case "websocket", "liquidityhub":
+	case "websocket", "coreclient", "liquidityhub", "walletupdates":
 		checkErr(interview(req, false))
 		checkErr(loadRSAKey(req))
 		genTimestamp(req)
@@ -253,9 +253,16 @@ func main() {
 		fmt.Printf("x-sign: %s\n", req.signature)
 		fmt.Printf("x-timestamp: %s\n", req.timestamp)
 
-		wsType := wsCoreClient
-		if os.Args[1] == "liquidityhub" {
+		var wsType int
+		switch os.Args[1] {
+		case "coreclient":
+			wsType = wsCoreClient
+		case "liquidityhub":
 			wsType = wsLiquidityHub
+		case "walletupdates":
+			wsType = wsWalletUpdates
+		default:
+			wsType = wsRaw
 		}
 
 		connectWebSocket(req, wsType)
