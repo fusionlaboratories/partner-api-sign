@@ -8,7 +8,6 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
-	"encoding/json"
 	"encoding/pem"
 	"flag"
 	"fmt"
@@ -206,12 +205,7 @@ func interview(req *request, requestBody bool) error {
 			buffer += scanner.Text() + "\n"
 		}
 		if buffer != "" {
-			compacted := []byte{}
-			b := bytes.NewBuffer(compacted)
-			if err := json.Compact(b, []byte(buffer)); err != nil {
-				return errors.Wrap(err, "invalid json")
-			}
-			req.body = b.Bytes()
+			req.body = []byte(buffer)
 		}
 	}
 
