@@ -203,7 +203,7 @@ func interview(req *request, requestBody bool) error {
 	if requestBody {
 		fmt.Printf("body (%s):\n", terminatorMessage)
 		reader := bufio.NewReader(os.Stdin)
-		readBuffer := make([]byte, 1024)
+		readBuffer := make([]byte, 10024)
 		var bodyBuffer []byte
 		for {
 			n, err := reader.Read(readBuffer)
