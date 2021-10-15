@@ -11,10 +11,12 @@ import (
 	"encoding/pem"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -194,18 +196,36 @@ func interview(req *request, requestBody bool) error {
 		req.uri = strings.TrimSpace(text)
 	}
 
+	terminatorMessage := "hit Ctrl+D (twice if body has no trailing new line) to end"
+	if runtime.GOOS == "windows" {
+		terminatorMessage = "hit Ctrl+Z followed by <enter> to end"
+	}
 	if requestBody {
-		fmt.Printf("body (hit return to end):\n")
-		scanner := bufio.NewScanner(os.Stdin)
-		buffer := ""
-		for scanner.Scan() {
-			if scanner.Text() == "" {
-				break
+		fmt.Printf("body (%s):\n", terminatorMessage)
+		reader := bufio.NewReader(os.Stdin)
+		readBuffer := make([]byte, 1024)
+		var bodyBuffer []byte
+		for {
+			n, err := reader.Read(readBuffer)
+			if err != nil {
+				if err == io.EOF {
+					break
+				}
 			}
-			buffer += scanner.Text() + "\n"
+			if n == 0 {
+				continue
+			}
+			if n > 1 {
+				if readBuffer[n-2] == '\r' && readBuffer[n-1] == '\n' {
+					readBuffer[n-2] = '\n'
+					n--
+				}
+			}
+			bodyBuffer = append(bodyBuffer, readBuffer[:n]...)
 		}
-		if buffer != "" {
-			req.body = []byte(buffer)
+
+		if len(bodyBuffer) != 0 {
+			req.body = bodyBuffer
 		}
 	}
 
