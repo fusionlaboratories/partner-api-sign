@@ -1,7 +1,11 @@
 # Partner API Signing Client
 
 ## Description
-This is a simple client program for setting up, generating and sending of signed requests to the Qredo Partner API.
+
+This is a simple client program that allows you to:
+
+* set up, generate and send signed requests to the Qredo Partner API.
+* connect to a websocket feed to perform custody for transactions (approve or reject tx requests) and connect wallets requests.
 
 ### Building
 
@@ -13,23 +17,28 @@ go build -o partner-api-sign
 ```
 
 ### Keys
+
 * Put your RSA private key in `pem` format in a file called `private.pem`
 * Put your base64-encoded API key in a file called `apikey`
 
 ### Signing
+
 To use the tool only for signing requests, run:
 ```
 ./partner-api-sign sign
 ```
-You will be prompted to enter url and body. Make sure that you body has a new line at the end.
-**Note:** the body should be a valid JSON and will be compacted before signing.
+
+You will be prompted to enter url and body. ~~Make sure that your body has a new line at the end.~~
+
+**Note:** The body should be in valid JSON format.
 
 #### Example
+
 GET request (no body)
 ```
 » ./partner-api-sign sign
 url: https://api.qredo.network/api/v1/p/company/search
-body (hit return to end):
+body (hit Ctrl+D (twice if message has no trailing new line) to end):
 
 x-sign: OJk5vbrUPku37o-SiRXhIEzCy5cqBK9VKVvGeS1DD_HmxcjOBsIumayJhyl3oWJejtKeaGE3-TvPBDUNNuwCnlwVgrZl3Qq8ejL_TNEWwA6bJ-ZqmhK8SLLelTT2r6yBB_3DMaIXcn1A2cz_EsqhJP6JT-0kMIFUcAT6AKPRKHH9Laf1jpoXlNUGi-wuoquh-AiJczSQN1j5SOSOP2EkEd2T5NdSgxHbdER8g-eWpUyeaO8z2HkmrfALhUz3okiWDS9gYXzo7HyRyIgfrD5hUFiUzZJbyjDkRTvFo8jXZ-A9LA4-q7Rj0EjWFmftrNYZ-sXVuIx2BDbiX0cHXdTWwA
 x-timestamp: 1605779886
@@ -39,7 +48,7 @@ PUT request (with body)
 ```
 » ./partner-api-sign sign
 url: https://api.qredo.network/api/v1/p/company/1eJFur7EANNaDjcqbm1ZgYFF5Nz
-body (hit return to end):
+body (hit Ctrl+D (twice if message has no trailing new line) to end):
 {
   "name": "ACME Corp17",
   "city": "Paris",
@@ -56,15 +65,23 @@ x-sign: APqwoFF-WdtwG9YDkrEVJWPCTQa9oXcIYsBkpO6Cwp9FxLjmh5uQmKMwIPATS4GAOGuRDSn8
 x-timestamp: 1605779886
 ```
 
+* When submitting a request with a body, the format of the JSON body must be the same as when signed.
+* If the JSON body includes tabs (as opposed to spaces), it might be pasted incorrectly, depending on the OS used. It is recommended to avoid JSON formatting that uses tabs.
+* On Linux/Mac, if your body includes a trailing new line, you must hit Ctrl+D on the keyboard once to generate your signature and timestamp. If your body **does not** have a trailing new line, you must you must hit Ctrl+D on the keyboard *twice* to generate your signature and timestamp.
+* On Windows, to end your body, hit Ctrl+Z on the keyboard, followed by &lt;enter&gt; to end the body input.
+
 ### Sending requests
-In subdirectory `requests/` create a new directory with the name of the request for example `company_new`. 
+In subdirectory `requests/` create a new directory with the name of the request for example `company_new`.
 Create two files in that directory named `uri` and `body` e.g.:
 
 file `requests/company_new/uri`:
+
 ```
 POST https://api.qredo.network/api/v1/p/company
 ```
+
 file `requests/company_new/body`:
+
 ```
 {
   "name": "ACME Corp",
@@ -73,16 +90,17 @@ file `requests/company_new/body`:
   "domain": "example.com",
   "ref": "9827feed-5eae-4e80-bda3-drtreteraa7c3b97add"
 }
-
 ```
 
 then run:
+
 ```
 ./partner-api-sign company_new
 ```
 where `company_new` is the directory name
 
 #### Full example
+
 ```
 » ./partner-api-sign company_new
 POST https://api.qredo.network/api/v1/p/company
@@ -97,7 +115,7 @@ x-timestamp: 1605779886
 ### Core client websocket
 
 Connect to core client websocket feed endpoint:
+
 ```
 ./partner-api-sign websocket -url wss://api.qredo.network/api/v1/p/coreclient/ZupenzfrjAixU7G5AoDTpH113mwBa6enNfnhkEETqWix/feed
 ```
-
