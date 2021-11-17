@@ -145,7 +145,6 @@ func signRequest(req *request) error {
 	h.Write([]byte(req.uri))
 	h.Write(req.body)
 	dgst := h.Sum(nil)
-	fmt.Printf("Hash: %x\n", dgst)
 	signature, err := rsa.SignPKCS1v15(nil, req.rsaKey, crypto.SHA256, dgst)
 	if err != nil {
 		return errors.Wrap(err, "sign request")
